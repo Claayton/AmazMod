@@ -80,7 +80,8 @@ public class NotificationService extends NotificationListenerService {
             "org.thunderdog.challegram"
     };
 
-    private ArrayMap<String, String> notificationTimeGone;
+    private static ArrayMap<String, String> notificationTimeGone;
+    private static ArrayMap<String, Long> textTimeGone;
     private ArrayMap<String, StatusBarNotification> notificationsAvailableToReply;
     Hashtable<Integer, int[]> grouped_notifications = new Hashtable<>();
 
@@ -514,6 +515,8 @@ public class NotificationService extends NotificationListenerService {
     private byte filter(StatusBarNotification statusBarNotification) {
         if (notificationTimeGone == null)
             notificationTimeGone = new ArrayMap<>();
+        if (textTimeGone == null)
+            textTimeGone = new ArrayMap<>();
 
         String notificationPackage = statusBarNotification.getPackageName();
         String notificationId = statusBarNotification.getKey();
@@ -558,6 +561,26 @@ public class NotificationService extends NotificationListenerService {
             text = bigText.toString();
 
         //Logger.debug("filter: notificationPackage: " + notificationPackage + " \\ text: " + text);
+
+        // Block re-posted notifications with the same content (e.g., WhatsApp re-posting
+        // unread chats periodically). Static map so it survives listener reconnections.
+        if (Prefs.getBoolean("pref_notifications_block_repeated", true) && !text.isEmpty()) {
+            String contentKey = notificationPackage + "\u0000" + text;
+            long now = System.currentTimeMillis();
+            Long lastSame = textTimeGone.get(contentKey);
+            if (lastSame != null && (now - lastSame) < BLOCK_INTERVAL) {
+                Logger.debug("[Marked] Notification blocked as REPEATED content");
+                return Constants.FILTER_BLOCK;
+            }
+            textTimeGone.put(contentKey, now);
+            if (textTimeGone.size() > 800) {
+                for (int i = textTimeGone.size() - 1; i >= 0; i--) {
+                    Long t = textTimeGone.valueAt(i);
+                    if (t != null && (now - t) > BLOCK_INTERVAL)
+                        textTimeGone.removeAt(i);
+                }
+            }
+        }
 
         if ( notificationTimeGone.containsKey(notificationId) ) {
             String previousText = notificationTimeGone.get(notificationId);

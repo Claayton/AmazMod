@@ -5,6 +5,8 @@
 
 AmazMod used to be a modified ("modded") Amazfit app, the companion app for Pace, Stratos, Stratos 3 and Verge watches built by Huami, changing and adding some of its features. But it has evolved to its own app that uses the data communication between Amazfit app on phone and the watch to implement its own notifications system and more.
 
+> **Fork note:** This is a personal fork of the archived [AmazMod/AmazMod](https://github.com/AmazMod/AmazMod) project. It adds a fix for duplicate/repeated notifications caused by apps (e.g. WhatsApp) re-posting unread notifications periodically. Notification forwarding now deduplicates by notification **content** (package + text) within a 30-minute window, so re-posts no longer buzz the watch again. See the `NotificationService` change in the commit history. Use at your own risk.
+
 
 ### Some features:  
 * Brand new notifications filter system, with the option to use customized ("canned") replies, show images and more;  
