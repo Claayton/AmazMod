@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
@@ -29,10 +30,14 @@ import com.pixplicity.easyprefs.library.Prefs;
 import org.tinylog.Logger;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.lang.reflect.Field;
 import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import amazmod.com.transport.Constants;
 import amazmod.com.transport.data.NotificationData;
@@ -151,6 +156,94 @@ public class NotificationFactory {
 
         if (Prefs.getBoolean(Constants.PREF_NOTIFICATIONS_IMAGES, Constants.PREF_NOTIFICATIONS_IMAGES_DEFAULT)) {
             extractPicture(statusBarNotification, notificationData);
+            extractMessagingImage(statusBarNotification, notificationData);
+        }
+    }
+
+    // Messaging apps (e.g. WhatsApp) reference received media by a private content URI
+    // that is not readable by other apps. However the same media is stored (group-readable)
+    // under Android/media/<pkg>/... So we match the message time against the file's
+    // last-modified time and ship that image to the watch.
+    private static final String[] MESSAGING_IMAGE_DIRS = {
+            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images",
+            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Sent"
+    };
+
+    private static void extractMessagingImage(StatusBarNotification statusBarNotification, NotificationData notificationData) {
+        try {
+            if (notificationData.getPicture() != null && notificationData.getPicture().length > 0)
+                return;
+
+            Bundle bundle = statusBarNotification.getNotification().extras;
+            Parcelable[] messages = bundle.getParcelableArray(Notification.EXTRA_MESSAGES);
+            if (messages == null || messages.length == 0)
+                return;
+
+            long imageTime = -1;
+            for (Parcelable parcelable : messages) {
+                if (!(parcelable instanceof Bundle))
+                    continue;
+                Bundle message = (Bundle) parcelable;
+                String type = message.getString("type");
+                if (type != null && type.startsWith("image/")) {
+                    long time = message.getLong("time", 0);
+                    if (time > imageTime)
+                        imageTime = time;
+                }
+            }
+            if (imageTime <= 0)
+                return;
+
+            // WhatsApp file names may not embed the message date, so match by last-modified
+            // time (the file is written right when the message arrives).
+            File best = null;
+            long bestDelta = Long.MAX_VALUE;
+            final long tolerance = 180000L;
+            for (String dir : MESSAGING_IMAGE_DIRS) {
+                File[] files = new File(dir).listFiles();
+                if (files == null)
+                    continue;
+                for (File file : files) {
+                    String lower = file.getName().toLowerCase(Locale.US);
+                    if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp")))
+                        continue;
+                    long delta = Math.abs(file.lastModified() - imageTime);
+                    if (delta < bestDelta) {
+                        bestDelta = delta;
+                        best = file;
+                    }
+                }
+            }
+
+            if (best == null || bestDelta > tolerance)
+                return;
+
+            Bitmap bitmap = decodeScaled(best.getAbsolutePath());
+            if (bitmap != null) {
+                Logger.debug("[Messaging image] matched {} (delta {} ms)", best.getName(), bestDelta);
+                addBitmap(bitmap, notificationData);
+            }
+        } catch (Throwable t) {
+            Logger.error(t, "extractMessagingImage failed: {}", t.getMessage());
+        }
+    }
+
+    private static Bitmap decodeScaled(String path) {
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(path, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0)
+                return null;
+            int sample = 1;
+            while ((bounds.outWidth / sample) > 640 || (bounds.outHeight / sample) > 640)
+                sample *= 2;
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = sample;
+            return BitmapFactory.decodeFile(path, options);
+        } catch (Throwable t) {
+            Logger.error(t, "decodeScaled failed: {}", t.getMessage());
+            return null;
         }
     }
 
