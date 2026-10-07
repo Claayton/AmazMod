@@ -911,13 +911,25 @@ public class NotificationService extends NotificationListenerService {
                     .getString(Constants.PREF_WATCH_MODEL, "");
 
             PersistentNotification persistentNotification = new PersistentNotification(this, model);
+
+            // onListenerConnected() runs on every NotificationListenerService reconnect. Re-posting
+            // here makes the status bar icon flash; skip it if the notification is already active.
+            NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            int notificationId = persistentNotification.getNotificationId();
+            if (mNotificationManager != null) {
+                for (StatusBarNotification sbn : mNotificationManager.getActiveNotifications()) {
+                    if (sbn.getId() == notificationId) {
+                        return;
+                    }
+                }
+            }
+
             Notification notification = persistentNotification.createPersistentNotification();
 
-            NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (mNotificationManager != null)
-                mNotificationManager.notify(persistentNotification.getNotificationId(), notification);
+                mNotificationManager.notify(notificationId, notification);
 
-            startForeground(persistentNotification.getNotificationId(), notification);
+            startForeground(notificationId, notification);
         }
     }
 

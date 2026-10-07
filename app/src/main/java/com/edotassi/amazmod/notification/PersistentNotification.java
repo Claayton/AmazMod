@@ -28,6 +28,7 @@ public class PersistentNotification {
     private String model;
     private NotificationManagerCompat notificationManager;
     private final static int NOTIFICATION_ID = 999989;
+    private static String lastMessage;
 
     public PersistentNotification(Context context, String model) {
         Resources res = context.getResources();
@@ -51,7 +52,7 @@ public class PersistentNotification {
         Intent notificationIntent = new Intent(context, MainActivity.class);
         notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent contentIntent = PendingIntent.getActivity(context,
-                (int) (long) (System.currentTimeMillis() % 10000L),notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         if (model != null) {
             if (AmazModApplication.isWatchConnected()) {
@@ -59,6 +60,8 @@ public class PersistentNotification {
             } else
                 msg = context.getResources().getString(R.string.device_not_connected);
         } else msg = context.getResources().getString(R.string.device_not_connected);
+
+        lastMessage = msg;
 
         Notification notification = new NotificationCompat.Builder(context, Constants.PERSISTENT_NOTIFICATION_CHANNEL)
                 .setSmallIcon(R.drawable.outline_watch_black_48)
@@ -116,7 +119,7 @@ public class PersistentNotification {
         Intent notificationIntent = new Intent(context, MainActivity.class);
         notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent contentIntent = PendingIntent.getActivity(context,
-                (int) (long) (System.currentTimeMillis() % 10000L), notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+                0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         if (model != null) {
             if (isWatchConnected) {
@@ -124,6 +127,13 @@ public class PersistentNotification {
             } else
                 msg = context.getResources().getString(R.string.device_not_connected);
         } else msg = context.getResources().getString(R.string.device_not_connected);
+
+        // Avoid re-posting (and flashing the status bar icon) when nothing changed
+        if (msg.equals(lastMessage)) {
+            return;
+        }
+        lastMessage = msg;
+
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, Constants.PERSISTENT_NOTIFICATION_CHANNEL)
                 .setSmallIcon(R.drawable.outline_watch_black_48)
                 .setContentTitle(Constants.TAG)

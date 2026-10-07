@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
+import android.service.notification.StatusBarNotification;
 
 import androidx.annotation.Nullable;
 import androidx.collection.ArrayMap;
@@ -381,10 +382,7 @@ public class TransportService extends Service implements Transporter.DataListene
             Notification notification = persistentNotification.createPersistentNotification();
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                if (mNotificationManager != null) {
-                    mNotificationManager.notify(persistentNotification.getNotificationId(), notification);
-                }
+                // startForeground posts the notification too; avoid an extra redundant update
                 startForeground(persistentNotification.getNotificationId(), notification);
             }
 
