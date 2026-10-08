@@ -14,42 +14,45 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 
 import amazmod.com.transport.data.NotificationData;
 
+/**
+ * In-memory store of custom notifications, keyed by {@code phoneKey|timestamp}.
+ *
+ * <p>It is written from the transport thread ({@code NotificationService}) and read from the
+ * UI thread, so all access is synchronized and snapshots are returned to callers that iterate.
+ */
 public class NotificationStore {
-
-    private static ArrayMap<String, NotificationData> customNotifications = new ArrayMap<>();
-    public static ArrayMap<String, String> keyMap = new ArrayMap<>();
-    private static ArrayMap<String, Long> timestamps = new ArrayMap<>();
 
     // Notifications older than this are removed automatically (1 hour)
     public static final long MAX_AGE = 60L * 60L * 1000L;
 
-    public NotificationStore() {
-        customNotifications = new ArrayMap<>();
-        keyMap = new ArrayMap<>();
-        timestamps = new ArrayMap<>();
-    }
+    private static final ArrayMap<String, NotificationData> customNotifications = new ArrayMap<>();
+    private static final ArrayMap<String, String> keyMap = new ArrayMap<>();
+    private static final ArrayMap<String, Long> timestamps = new ArrayMap<>();
 
-    public static NotificationData getCustomNotification(String key) {
+    public static synchronized NotificationData getCustomNotification(String key) {
         return customNotifications.get(key);
     }
 
-    public static int getCustomNotificationCount() {
+    public static synchronized int getCustomNotificationCount() {
         return customNotifications.size();
     }
 
-    public static void addCustomNotification(String key, NotificationData notificationData) {
+    public static synchronized void addCustomNotification(String key, NotificationData notificationData) {
         customNotifications.put(key, notificationData);
         keyMap.put(key, notificationData.getKey());
         timestamps.put(key, System.currentTimeMillis());
-        purgeExpired();
+        purgeExpiredLocked();
     }
 
-    // Removes notifications older than MAX_AGE (1 hour)
-    public static void purgeExpired() {
+    /** Removes notifications older than {@link #MAX_AGE} (1 hour). */
+    public static synchronized void purgeExpired() {
+        purgeExpiredLocked();
+    }
+
+    private static void purgeExpiredLocked() {
         if (timestamps.isEmpty())
             return;
         final long now = System.currentTimeMillis();
@@ -67,8 +70,8 @@ public class NotificationStore {
         }
     }
 
-    // Removes the stored notification(s) matching an original phone notification key
-    public static void removeByNotificationKey(String originalKey) {
+    /** Removes the stored notification(s) matching an original phone notification key. */
+    public static synchronized void removeByNotificationKey(String originalKey) {
         if (originalKey == null)
             return;
         List<String> toRemove = new ArrayList<>();
@@ -83,8 +86,8 @@ public class NotificationStore {
         }
     }
 
-    // Returns the store keys of a conversation (same phone key), sorted oldest -> newest
-    public static List<String> getConversationStoreKeys(String originalKey) {
+    /** Store keys of a conversation (same phone key), sorted oldest -> newest. */
+    public static synchronized List<String> getConversationStoreKeys(String originalKey) {
         List<String> keys = new ArrayList<>();
         if (originalKey == null)
             return keys;
@@ -101,99 +104,44 @@ public class NotificationStore {
         return keys;
     }
 
-    private static long parseTimestamp(String storeKey) {
-        try {
-            return Long.parseLong(storeKey.substring(storeKey.lastIndexOf("|") + 1));
-        } catch (Exception e) {
-            return 0L;
-        }
+    /** Snapshot of all store keys (safe to iterate outside the store lock). */
+    public static synchronized List<String> getStoreKeys() {
+        return new ArrayList<>(customNotifications.keySet());
     }
 
-    public static void removeCustomNotification(String key, Context context) {
-        NotificationData notificationData = NotificationStore.getCustomNotification(key);
-        // Updates the notification counter only if del action is not send (NotificationData is null)
-        if (notificationData == null)
-            DeviceUtil.notificationCounter(context, -1,"NotificationWearActivity notification is null (del action will not be send)");
-        else{
-            // Remove custom notification
+    public static synchronized String getKey(String key) {
+        NotificationData notificationData = customNotifications.get(key);
+        return notificationData == null ? null : notificationData.getKey();
+    }
+
+    public static synchronized Boolean getHideReplies(String key) {
+        NotificationData notificationData = customNotifications.get(key);
+        return notificationData == null ? Boolean.TRUE : notificationData.getHideReplies();
+    }
+
+    public static synchronized Boolean getForceCustom(String key) {
+        NotificationData notificationData = customNotifications.get(key);
+        return notificationData == null ? Boolean.TRUE : notificationData.getForceCustom();
+    }
+
+    public static synchronized int getTimeoutRelock(String key) {
+        NotificationData notificationData = customNotifications.get(key);
+        return notificationData == null ? 0 : notificationData.getTimeoutRelock();
+    }
+
+    public static synchronized void removeCustomNotification(String key, Context context) {
+        NotificationData notificationData = customNotifications.get(key);
+        // Updates the notification counter only if del action is not sent (NotificationData is null)
+        if (notificationData == null) {
+            DeviceUtil.notificationCounter(context, -1,
+                    "NotificationWearActivity notification is null (del action will not be send)");
+        } else {
             sendRequestDeleteNotification(key, notificationData);
-            customNotifications.remove(key);
-            keyMap.remove(key);
+            removeLocked(key);
         }
     }
 
-    /*// Not used
-    public static void removeCustomNotification(String key) {
-        sendRequestDeleteNotification(key);
-        customNotifications.remove(key);
-        keyMap.remove(key);
-    }
-    */
-
-    public static String getKey(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return null;
-        else
-            return notificationData.getKey();
-    }
-
-    public static Boolean getHideReplies(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return true;
-        else
-            return notificationData.getHideReplies();
-    }
-
-    public static Boolean getForceCustom(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return true;
-        else
-            return notificationData.getForceCustom();
-    }
-
-    public static int getTimeoutRelock(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return 0;
-        else
-            return notificationData.getTimeoutRelock();
-    }
-
-    public static String getTitle(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return null;
-        else
-            return notificationData.getTitle();
-    }
-
-    public static String getTime(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return null;
-        else
-            return notificationData.getTime();
-    }
-
-    public static int[] getIcon(String key) {
-        NotificationData notificationData = customNotifications.get(key);
-        if (notificationData == null)
-            return null;
-        else
-            return notificationData.getIcon();
-    }
-
-    public static Set<String> getKeySet() {
-        if (customNotifications != null)
-            return customNotifications.keySet();
-        else
-            return null;
-    }
-
-    public static void clear() {
+    public static synchronized void clear() {
         if (!customNotifications.isEmpty()) {
             for (String key : customNotifications.keySet())
                 sendRequestDeleteNotification(key);
@@ -201,6 +149,12 @@ public class NotificationStore {
             keyMap.clear();
             timestamps.clear();
         }
+    }
+
+    private static void removeLocked(String key) {
+        customNotifications.remove(key);
+        keyMap.remove(key);
+        timestamps.remove(key);
     }
 
     public static void setNotificationCount(Context context) {
@@ -211,26 +165,25 @@ public class NotificationStore {
         DeviceUtil.notificationCounterSet(context, count);
     }
 
-    private static boolean isEmpty() {
-        return getCustomNotificationCount() == 0;
+    private static long parseTimestamp(String storeKey) {
+        try {
+            return Long.parseLong(storeKey.substring(storeKey.lastIndexOf("|") + 1));
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
-    // Send notification delete
     private static void sendRequestDeleteNotification(String key) {
         sendRequestDeleteNotification(key, customNotifications.get(key));
     }
+
     private static void sendRequestDeleteNotification(String key, NotificationData notificationData) {
         Logger.debug("NotificationStore sendRequestDeleteNotification key: {} ", key);
-
         if (notificationData == null)
             return;
-
         String pkg = key.split("\\|")[1];
-        // Logger.debug("NotificationStore sendRequestDeleteNotification pkg: {} ", pkg);
-
-        // NotificationKeyData from(String pkg, int id, String tag, String key, String targetPkg)
-        NotificationKeyData notificationKeyData = NotificationKeyData.from(pkg, notificationData.getId(),null, notificationData.getKey(), null);
+        NotificationKeyData notificationKeyData = NotificationKeyData.from(pkg, notificationData.getId(),
+                null, notificationData.getKey(), null);
         EventBus.getDefault().post(notificationKeyData);
     }
-
 }

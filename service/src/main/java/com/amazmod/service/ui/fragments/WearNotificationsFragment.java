@@ -134,18 +134,17 @@ public class WearNotificationsFragment extends Fragment {
         List<NotificationInfo> list = new ArrayList<>();
 
         ArrayMap<String, List<String>> conversations = new ArrayMap<>();
-        if (NotificationStore.getKeySet() != null) {
-            for (String storeKey : NotificationStore.getKeySet()) {
-                String convKey = NotificationStore.getKey(storeKey);
-                if (convKey == null)
-                    convKey = storeKey;
-                List<String> keys = conversations.get(convKey);
-                if (keys == null) {
-                    keys = new ArrayList<>();
-                    conversations.put(convKey, keys);
-                }
-                keys.add(storeKey);
+        List<String> allStoreKeys = NotificationStore.getStoreKeys();
+        for (String storeKey : allStoreKeys) {
+            String convKey = NotificationStore.getKey(storeKey);
+            if (convKey == null)
+                convKey = storeKey;
+            List<String> keys = conversations.get(convKey);
+            if (keys == null) {
+                keys = new ArrayList<>();
+                conversations.put(convKey, keys);
             }
+            keys.add(storeKey);
         }
 
         for (int i = 0; i < conversations.size(); i++) {

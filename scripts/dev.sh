@@ -26,9 +26,10 @@ find_phone() { adb devices -l | awk '/SM_G780G|r8qxx/{print $1; exit}'; }
 
 gradle_build() { (cd "$ROOT" && ./gradlew -q "$1" --no-daemon); }
 
-install_latest() { # $1=serial  $2=glob
-  local serial="$1" apk
-  apk="$(ls -t $2 | head -1)"
+install_latest() { # $1=serial  $2=apk dir
+  local serial="$1" dir="$2" apk
+  apk="$(ls -t "$dir"/*.apk 2>/dev/null | head -1)"
+  [ -n "$apk" ] || { echo "No APK in $dir"; exit 1; }
   echo "Installing $(basename "$apk") on $serial"
   adb -s "$serial" install -r "$apk"
 }
@@ -45,13 +46,13 @@ case "$TARGET" in
   service)
     gradle_build ":service:assembleDebug"
     W="$(find_watch)"; [ -n "$W" ] || { echo "Watch not found via adb"; exit 1; }
-    install_latest "$W" "$ROOT/service/build/outputs/apk/debug/*.apk"
+    install_latest "$W" "$ROOT/service/build/outputs/apk/debug"
     adb -s "$W" shell am start -n com.amazmod.service/.springboard.LauncherWearGridActivity >/dev/null 2>&1 || true
     ;;
   app)
     gradle_build ":app:assembleDebug"
     P="$(find_phone)"; [ -n "$P" ] || { echo "Phone not found via adb"; exit 1; }
-    install_latest "$P" "$ROOT/app/build/outputs/apk/debug/*.apk"
+    install_latest "$P" "$ROOT/app/build/outputs/apk/debug"
     rebind_listener "$P"
     ;;
   preview)
