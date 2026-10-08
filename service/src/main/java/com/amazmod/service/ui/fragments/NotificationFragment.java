@@ -32,9 +32,9 @@ import androidx.emoji.widget.EmojiTextView;
 
 import com.amazmod.service.Constants;
 import com.amazmod.service.R;
-import com.amazmod.service.events.ReplyNotificationEvent;
 import com.amazmod.service.events.SilenceApplicationEvent;
 import com.amazmod.service.support.NotificationStore;
+import com.amazmod.service.support.ReplyHelper;
 import com.amazmod.service.ui.ConversationActivity;
 import com.amazmod.service.ui.NotificationWearActivity;
 import com.amazmod.service.util.FragmentUtil;
@@ -681,10 +681,7 @@ public class NotificationFragment extends Fragment implements DelayedConfirmatio
                     Logger.error("cannot silence null key");
                 break;
             case ACTION_REPLY:
-                if (notificationKey != null)
-                    EventBus.getDefault().post(new ReplyNotificationEvent(notificationKey, selectedReply));
-                else
-                    Logger.error("cannot reply null key");
+                ReplyHelper.sendReply(notificationKey, selectedReply);
                 break;
         }
         getActivity().finish();

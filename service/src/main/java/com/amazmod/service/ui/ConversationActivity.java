@@ -16,14 +16,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.amazmod.service.R;
-import com.amazmod.service.events.ReplyNotificationEvent;
 import com.amazmod.service.support.NotificationStore;
+import com.amazmod.service.support.ReplyHelper;
 import com.amazmod.service.ui.view.MessageBubbleView;
 import com.amazmod.service.ui.view.ReplyPillView;
 import com.amazmod.service.util.FragmentUtil;
 import com.amazmod.service.util.SafeArea;
 
-import org.greenrobot.eventbus.EventBus;
 import org.tinylog.Logger;
 
 import java.util.List;
@@ -248,7 +247,7 @@ public class ConversationActivity extends Activity {
     }
 
     private void sendReply(String value) {
-        EventBus.getDefault().post(new ReplyNotificationEvent(conversationKey, value));
+        ReplyHelper.sendReply(conversationKey, value);
         NotificationStore.removeByNotificationKey(conversationKey);
         Logger.debug("ConversationActivity sendReply: {}", value);
         Toast.makeText(this, getString(R.string.amz_reply_sent), Toast.LENGTH_SHORT).show();
