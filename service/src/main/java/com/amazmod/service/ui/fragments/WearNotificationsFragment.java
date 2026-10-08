@@ -1,6 +1,5 @@
 package com.amazmod.service.ui.fragments;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -8,34 +7,32 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.support.wearable.view.BoxInsetLayout;
-import android.support.wearable.view.WearableListView;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.AnimationUtils;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.collection.ArrayMap;
+import androidx.core.graphics.drawable.RoundedBitmapDrawable;
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory;
 
 import com.amazmod.service.R;
-import com.amazmod.service.adapters.NotificationListAdapter;
-import com.amazmod.service.helper.RecyclerTouchListener;
 import com.amazmod.service.support.NotificationInfo;
 import com.amazmod.service.support.NotificationStore;
 import com.amazmod.service.ui.ConversationActivity;
-import com.amazmod.service.ui.NotificationWearActivity;
 import com.amazmod.service.util.DeviceUtil;
-import com.amazmod.service.util.SafeArea;
 
 import amazmod.com.transport.data.NotificationData;
 
@@ -45,75 +42,77 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.Callable;
 
-import io.reactivex.Flowable;
-import io.reactivex.functions.Consumer;
-import io.reactivex.schedulers.Schedulers;
-
+/**
+ * Notifications screen built as a single continuous scroll surface:
+ * the title and the conversation cards flow together (no fixed header overlay).
+ */
 public class WearNotificationsFragment extends Fragment {
 
     static WearNotificationsFragment instance = null;
 
-    private BoxInsetLayout rootLayout;
-    private RelativeLayout wearNotificationsFrameLayout;
-	private WearableListView listView;
-    private TextView mHeader;
-    private ProgressBar progressBar;
+    private static final int SWIPE_THRESHOLD = 60;
+    private static final int DELETE_REVEAL = 90;
 
     private Context mContext;
+    private ScrollView scroll;
+    private LinearLayout content;
 
-    private List<NotificationInfo> notificationInfoList;
-    private NotificationListAdapter mAdapter;
+    private List<NotificationInfo> notificationInfoList = new ArrayList<>();
+    private boolean animate = false;
 
-    private static boolean animate = false;
+    public static WearNotificationsFragment newInstance(boolean animate) {
+        WearNotificationsFragment fragment = new WearNotificationsFragment();
+        Bundle bundle = new Bundle();
+        bundle.putBoolean("animate", animate);
+        fragment.setArguments(bundle);
+        return fragment;
+    }
 
-    //private static final String REFRESH = "Refresh";
-    //private static final String CLEAR = "Clear";
-    public static final String ANIMATE = "animate";
-
+    public static WearNotificationsFragment getInstance() {
+        return instance;
+    }
 
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
         this.mContext = activity.getBaseContext();
-        Logger.info("WearNotificationsFragment onAttach context: " + mContext);
+        instance = this;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        animate = getArguments().getBoolean(ANIMATE);
-
-        Logger.info("WearNotificationsFragment onCreate animate: {}", animate);
-        instance = this;
-
+        if (getArguments() != null)
+            animate = getArguments().getBoolean("animate");
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        super.onCreateView(inflater, container, savedInstanceState);
-        Logger.info("WearNotificationsFragment onCreateView");
+        scroll = new ScrollView(mContext);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(getResources().getColor(R.color.amz_bg));
 
-        View view = inflater.inflate(R.layout.fragment_wear_notifications, container, false);
+        content = new LinearLayout(mContext);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(14);
+        content.setPadding(pad, dp(40), pad, dp(28));
+        scroll.addView(content, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        if (animate)
-            view.startAnimation(AnimationUtils.loadAnimation(getActivity(), R.anim.slide_in_from_right));
-
-        return view;
+        return scroll;
     }
 
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Logger.info("WearNotificationsFragment onViewCreated");
-        init();
+        loadNotifications();
     }
 
     @Override
-    public void onStart() {
-        super.onStart();
+    public void onResume() {
+        super.onResume();
+        loadNotifications();
     }
 
     @Override
@@ -121,225 +120,294 @@ public class WearNotificationsFragment extends Fragment {
         super.onDestroy();
     }
 
-    public void onItemClick(int position) {
+    public void loadNotifications() {
+        if (getActivity() == null || content == null)
+            return;
 
-        Logger.info("WearNotificationsFragment onClick position: " + position);
-
-        if (position >= 0 && position < notificationInfoList.size())
-            showNotification(position);
+        notificationInfoList = buildConversations();
+        render();
     }
 
-    public void onItemLongClick(int position) {
+    private List<NotificationInfo> buildConversations() {
+        NotificationStore.purgeExpired();
 
-        Logger.info("WearNotificationsFragment onLongClick position: " + position);
+        List<NotificationInfo> list = new ArrayList<>();
 
-        if (!getResources().getString(R.string.refresh).equals(notificationInfoList.get(position).getNotificationTitle()))
-            deleteNotification(position, true);
+        ArrayMap<String, List<String>> conversations = new ArrayMap<>();
+        if (NotificationStore.getKeySet() != null) {
+            for (String storeKey : NotificationStore.getKeySet()) {
+                String convKey = NotificationStore.getKey(storeKey);
+                if (convKey == null)
+                    convKey = storeKey;
+                List<String> keys = conversations.get(convKey);
+                if (keys == null) {
+                    keys = new ArrayList<>();
+                    conversations.put(convKey, keys);
+                }
+                keys.add(storeKey);
+            }
+        }
+
+        for (int i = 0; i < conversations.size(); i++) {
+            String convKey = conversations.keyAt(i);
+            List<String> storeKeys = conversations.valueAt(i);
+
+            String latestStoreKey = null;
+            long latest = Long.MIN_VALUE;
+            for (String storeKey : storeKeys) {
+                long ts;
+                try {
+                    ts = Long.parseLong(storeKey.substring(storeKey.lastIndexOf("|") + 1));
+                } catch (NumberFormatException e) {
+                    ts = 0L;
+                }
+                if (ts > latest) {
+                    latest = ts;
+                    latestStoreKey = storeKey;
+                }
+            }
+
+            NotificationData data = NotificationStore.getCustomNotification(latestStoreKey);
+            if (data != null)
+                list.add(new NotificationInfo(data, latestStoreKey, convKey, storeKeys.size()));
+        }
+
+        Collections.sort(list, new Comparator<NotificationInfo>() {
+            @Override
+            public int compare(NotificationInfo a, NotificationInfo b) {
+                return b.getId().compareTo(a.getId());
+            }
+        });
+
+        return list;
     }
 
-    private void init() {
-        rootLayout = getActivity().findViewById(R.id.wear_notifications_main_layout);
-        wearNotificationsFrameLayout = getActivity().findViewById(R.id.wear_notifications_frame_layout);
-        listView = getActivity().findViewById(R.id.wear_notifications_list);
-        mHeader = getActivity().findViewById(R.id.wear_notifications_header);
-        progressBar = getActivity().findViewById(R.id.wear_notifications_loading_spinner);
+    private void render() {
+        content.removeAllViews();
 
-        rootLayout.setBackgroundColor(mContext.getResources().getColor(R.color.black));
+        addHeaderRow();
 
-        listView.setLongClickable(true);
-        listView.setGreedyTouchMode(true);
-        listView.addOnScrollListener(mOnScrollListener);
+        if (notificationInfoList.isEmpty()) {
+            TextView empty = new TextView(mContext);
+            empty.setText(getResources().getString(R.string.empty));
+            empty.setTextColor(getResources().getColor(R.color.amz_text_secondary));
+            empty.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            empty.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.topMargin = dp(30);
+            content.addView(empty, params);
+            return;
+        }
 
-        final RecyclerTouchListener touchListener = new RecyclerTouchListener(mContext, listView, new RecyclerTouchListener.ClickListener() {
+        for (NotificationInfo info : notificationInfoList)
+            content.addView(buildCard(info));
+    }
+
+    private void addHeaderRow() {
+        LinearLayout header = new LinearLayout(mContext);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        headerParams.bottomMargin = dp(10);
+
+        TextView title = new TextView(mContext);
+        title.setText(getResources().getString(R.string.notifications));
+        title.setTextColor(getResources().getColor(R.color.amz_text));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        header.addView(title, titleParams);
+
+        ImageView overflow = new ImageView(mContext);
+        overflow.setImageResource(R.drawable.ic_more_vert);
+        overflow.setPadding(dp(4), dp(4), dp(4), dp(4));
+        LinearLayout.LayoutParams overflowParams = new LinearLayout.LayoutParams(dp(32), dp(32));
+        overflow.setLayoutParams(overflowParams);
+        overflow.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view, int position) {
-                Logger.debug("WearNotificationsFragment addOnItemTouchListener onClick");
-                onItemClick(position);
-            }
-
-            @Override
-            public void onLongClick(View view, int position) {
-                Logger.debug("WearNotificationsFragment addOnItemTouchListener onLongClick");
-                onItemLongClick(position);
-            }
-        });
-        touchListener.setSwipeListener(new RecyclerTouchListener.SwipeListener() {
-            @Override
-            public void onSwipeLeft(View view, int position) {
-                Logger.debug("WearNotificationsFragment onSwipeLeft position: " + position);
-                deleteNotification(position, false);
-            }
-        });
-        listView.addOnItemTouchListener(touchListener);
-
-        mHeader.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
+            public void onClick(View v) {
                 showMenu();
             }
         });
+        header.addView(overflow);
 
-        View overflow = getActivity().findViewById(R.id.wear_notifications_overflow);
-        if (overflow != null) {
-            overflow.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    showMenu();
-                }
-            });
-        }
-
-        loadNotifications();
+        content.addView(header, headerParams);
     }
 
-    @SuppressLint("CheckResult")
-    public void loadNotifications() {
-        Logger.info("WearNotificationsFragment loadNotifications");
+    private View buildCard(final NotificationInfo info) {
+        LinearLayout card = new LinearLayout(mContext);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_bubble);
+        int pad = dp(10);
+        card.setPadding(pad, pad, pad, pad);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.topMargin = dp(4);
+        cardParams.bottomMargin = dp(4);
+        card.setLayoutParams(cardParams);
 
-        //Return if there is no activity to avoid crashes
-        if (getActivity() == null)
-            return;
+        ImageView icon = new ImageView(mContext);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        icon.setLayoutParams(iconParams);
+        setCardIcon(icon, info);
+        card.addView(icon);
 
-        wearNotificationsFrameLayout.setVisibility(View.VISIBLE);
-        listView.setVisibility(View.GONE);
-        progressBar.setVisibility(View.VISIBLE);
+        LinearLayout texts = new LinearLayout(mContext);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textsParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        textsParams.leftMargin = dp(10);
+        textsParams.rightMargin = dp(8);
+        card.addView(texts, textsParams);
 
-        Flowable.fromCallable(new Callable<List<NotificationInfo>>() {
-            @Override
-            public List<NotificationInfo> call() {
-                Logger.debug("WearNotificationsFragment loadNotifications call");
+        TextView title = new TextView(mContext);
+        title.setText(info.getNotificationTitle());
+        title.setTextColor(getResources().getColor(R.color.amz_text));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setSingleLine(true);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        texts.addView(title);
 
-                NotificationStore.purgeExpired();
+        TextView preview = new TextView(mContext);
+        preview.setText(info.getNotificationText());
+        preview.setTextColor(getResources().getColor(R.color.amz_text_secondary));
+        preview.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        preview.setSingleLine(true);
+        preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        previewParams.topMargin = dp(2);
+        texts.addView(preview, previewParams);
 
-                List<NotificationInfo> notificationInfoList = new ArrayList<>();
+        LinearLayout meta = new LinearLayout(mContext);
+        meta.setOrientation(LinearLayout.VERTICAL);
+        meta.setGravity(Gravity.CENTER);
+        card.addView(meta);
 
-                // Group notifications by conversation (original phone notification key)
-                ArrayMap<String, List<String>> conversations = new ArrayMap<>();
-                if (NotificationStore.getKeySet() != null) {
-                    for (String storeKey : NotificationStore.getKeySet()) {
-                        String convKey = NotificationStore.getKey(storeKey);
-                        if (convKey == null)
-                            convKey = storeKey;
-                        List<String> keys = conversations.get(convKey);
-                        if (keys == null) {
-                            keys = new ArrayList<>();
-                            conversations.put(convKey, keys);
-                        }
-                        keys.add(storeKey);
-                    }
+        TextView time = new TextView(mContext);
+        time.setText(info.getNotificationTime());
+        time.setTextColor(getResources().getColor(R.color.amz_text_secondary));
+        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        time.setGravity(Gravity.CENTER);
+        meta.addView(time);
+
+        if (info.getMessageCount() > 1) {
+            TextView badge = new TextView(mContext);
+            badge.setText(String.valueOf(info.getMessageCount()));
+            badge.setTextColor(Color.WHITE);
+            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            badge.setTypeface(Typeface.DEFAULT_BOLD);
+            badge.setGravity(Gravity.CENTER);
+            badge.setBackgroundResource(R.drawable.bg_badge);
+            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(22), dp(22));
+            badgeParams.topMargin = dp(4);
+            badgeParams.gravity = Gravity.CENTER;
+            meta.addView(badge, badgeParams);
+        }
+
+        attachGestures(card, info);
+        return card;
+    }
+
+    private void setCardIcon(ImageView iconView, final NotificationInfo info) {
+        try {
+            byte[] largeIconData = info.getLargeIconData();
+            if (largeIconData != null && largeIconData.length > 0) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(largeIconData, 0, largeIconData.length);
+                if (bitmap != null) {
+                    RoundedBitmapDrawable rounded = RoundedBitmapDrawableFactory.create(getResources(), bitmap);
+                    rounded.setCircular(true);
+                    rounded.setAntiAlias(true);
+                    iconView.setImageDrawable(rounded);
+                    return;
                 }
-
-                for (int i = 0; i < conversations.size(); i++) {
-                    String convKey = conversations.keyAt(i);
-                    List<String> storeKeys = conversations.valueAt(i);
-
-                    // Representative = latest message in the conversation
-                    String latestStoreKey = null;
-                    long latest = Long.MIN_VALUE;
-                    for (String storeKey : storeKeys) {
-                        long ts;
-                        try {
-                            ts = Long.parseLong(storeKey.substring(storeKey.lastIndexOf("|") + 1));
-                        } catch (NumberFormatException e) {
-                            ts = 0L;
-                        }
-                        if (ts > latest) {
-                            latest = ts;
-                            latestStoreKey = storeKey;
-                        }
-                    }
-
-                    NotificationData data = NotificationStore.getCustomNotification(latestStoreKey);
-                    if (data != null) {
-                        Logger.debug("WearNotificationsFragment conversation {} with {} messages", convKey, storeKeys.size());
-                        notificationInfoList.add(new NotificationInfo(data, latestStoreKey, convKey, storeKeys.size()));
-                    }
-                }
-
-                sortNotifications(notificationInfoList);
-                WearNotificationsFragment.this.notificationInfoList = notificationInfoList;
-                return notificationInfoList;
             }
-        }).subscribeOn(Schedulers.computation())
-                .observeOn(Schedulers.single())
-                .subscribe(new Consumer<List<NotificationInfo>>() {
-                    @Override
-                    public void accept(final List<NotificationInfo> notificationInfoList) {
-                        getActivity().runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                Logger.debug("WearNotificationsFragment loadNotifications run");
-                                mAdapter = new NotificationListAdapter(mContext, notificationInfoList);
-                                if (notificationInfoList.isEmpty())
-                                    mHeader.setText(mContext.getResources().getString(R.string.empty));
-                                else
-                                    mHeader.setText(mContext.getResources().getString(R.string.notifications));
-                                listView.setAdapter(mAdapter);
-                                listView.post(new Runnable() {
-                                    public void run() {
-                                        Logger.debug("WearNotificationsFragment loadNotifications scrollToTop");
-                                        listView.smoothScrollToPosition(0);
-                                    }
-                                });
-                                progressBar.setVisibility(View.GONE);
-                                listView.setVisibility(View.VISIBLE);
-                            }
-                        });
-                    }
-                }, throwable -> {
-                    Logger.error("WearNotificationsFragment: Flowable: subscribeOn: " + throwable.getMessage());
-                });
+            Drawable drawable = info.getIcon();
+            if (drawable != null)
+                iconView.setImageDrawable(drawable);
+            else
+                iconView.setImageResource(R.drawable.amazmod);
+        } catch (Exception e) {
+            Logger.error(e, "setCardIcon: {}", e.getMessage());
+        }
     }
 
-    private void showNotification(final int itemChosen) {
+    private void attachGestures(final LinearLayout card, final NotificationInfo info) {
+        card.setOnTouchListener(new View.OnTouchListener() {
+            private float downX, downY;
+            private boolean swiping;
 
-        final NotificationInfo info = notificationInfoList.get(itemChosen);
-        Logger.debug("WearNotificationsFragment showNotification conversationKey: " + info.getConversationKey());
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = event.getX();
+                        downY = event.getY();
+                        swiping = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dx = event.getX() - downX;
+                        float dy = event.getY() - downY;
+                        if (!swiping && dx < -20 && Math.abs(dx) > Math.abs(dy))
+                            swiping = true;
+                        if (swiping)
+                            v.setTranslationX(Math.max(dx, -DELETE_REVEAL));
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        v.animate().translationX(0).setDuration(120).start();
+                        if (swiping) {
+                            float total = event.getX() - downX;
+                            if (total < -SWIPE_THRESHOLD)
+                                deleteNotification(info, false);
+                        } else {
+                            float moved = Math.abs(event.getX() - downX) + Math.abs(event.getY() - downY);
+                            if (moved < 20)
+                                openConversation(info);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        v.animate().translationX(0).setDuration(120).start();
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        card.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                deleteNotification(info, true);
+                return true;
+            }
+        });
+    }
 
-        if (info.getConversationKey() != null) {
-            // Open the conversation (all messages of the same chat)
-            Intent intent = new Intent(mContext, ConversationActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra(ConversationActivity.KEY, info.getConversationKey());
-            intent.putExtra(ConversationActivity.TITLE, info.getNotificationTitle());
-            mContext.startActivity(intent);
+    private void openConversation(NotificationInfo info) {
+        if (info.getConversationKey() == null)
             return;
-        }
-
-        final String key = info.getKey();
-
-        Intent intent = new Intent(mContext, NotificationWearActivity.class);
+        Intent intent = new Intent(getActivity(), ConversationActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
                 Intent.FLAG_ACTIVITY_CLEAR_TOP |
                 Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        intent.putExtra(NotificationWearActivity.KEY, key);
-        intent.putExtra(NotificationWearActivity.MODE, NotificationWearActivity.MODE_VIEW);
-
-        mContext.startActivity(intent);
+        intent.putExtra(ConversationActivity.KEY, info.getConversationKey());
+        intent.putExtra(ConversationActivity.TITLE, info.getNotificationTitle());
+        startActivity(intent);
     }
 
-    private void deleteNotification(final int itemChosen, boolean confirm) {
-
-        if (itemChosen < 0 || itemChosen >= notificationInfoList.size())
-            return;
-
-        final NotificationInfo info = notificationInfoList.get(itemChosen);
-        final String title = info.getNotificationTitle();
-        if (getResources().getString(R.string.refresh).equals(title) || getResources().getString(R.string.clear).equals(title))
-            return;
-
-        Logger.debug("WearNotificationsFragment deleteNotification title: " + title);
-
+    private void deleteNotification(final NotificationInfo info, boolean confirm) {
         if (!confirm) {
             removeNotification(info);
             return;
         }
-
         new AlertDialog.Builder(getActivity())
-                .setTitle(mContext.getResources().getString(R.string.delete))
-                .setMessage(mContext.getResources().getString(R.string.confirmation))
+                .setTitle(getResources().getString(R.string.delete))
+                .setMessage(getResources().getString(R.string.confirmation))
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         removeNotification(info);
@@ -351,52 +419,8 @@ public class WearNotificationsFragment extends Fragment {
     private void removeNotification(NotificationInfo info) {
         if (info.getConversationKey() != null)
             NotificationStore.removeByNotificationKey(info.getConversationKey());
-        else
-            NotificationStore.removeCustomNotification(info.getKey(), mContext);
         NotificationStore.setNotificationCount(mContext);
         loadNotifications();
-    }
-
-    // The following code ensures that the title scrolls as the user scrolls up
-    // or down the list
-    private WearableListView.OnScrollListener mOnScrollListener =
-            new WearableListView.OnScrollListener() {
-                @Override
-                public void onAbsoluteScrollChange(int i) {
-                    // Only scroll the title up from its original base position
-                    // and not down.
-                    if (i > 0) {
-                        mHeader.setY(-i);
-                    }
-                }
-
-                @Override
-                public void onScroll(int i) {
-                    // Placeholder
-                }
-
-                @Override
-                public void onScrollStateChanged(int i) {
-                    // Placeholder
-                }
-
-                @Override
-                public void onCentralPositionChanged(int i) {
-                    // Placeholder
-                }
-            };
-
-    private void sortNotifications(List<NotificationInfo> notificationInfoList) {
-        Collections.sort(notificationInfoList, new Comparator<NotificationInfo>() {
-            @Override
-            public int compare(NotificationInfo o1, NotificationInfo o2) {
-                return o2.getId().compareTo(o1.getId());
-            }
-        });
-    }
-
-    private void resetNotificationsCounter() {
-        DeviceUtil.notificationCounterSet(mContext, 0);
     }
 
     private void showMenu() {
@@ -412,8 +436,8 @@ public class WearNotificationsFragment extends Fragment {
         layout.setPadding(pad, dp(18), pad, dp(12));
 
         TextView title = new TextView(ctx);
-        title.setText(ctx.getString(R.string.notifications));
-        title.setTextColor(ctx.getResources().getColor(R.color.amz_text));
+        title.setText(getResources().getString(R.string.notifications));
+        title.setTextColor(getResources().getColor(R.color.amz_text));
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setGravity(Gravity.CENTER);
@@ -425,7 +449,7 @@ public class WearNotificationsFragment extends Fragment {
         layout.addView(menuButton(ctx, "Atualizar", new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
-                reloadList();
+                loadNotifications();
             }
         }));
 
@@ -438,7 +462,7 @@ public class WearNotificationsFragment extends Fragment {
 
         TextView cancel = new TextView(ctx);
         cancel.setText("Cancelar");
-        cancel.setTextColor(ctx.getResources().getColor(R.color.amz_text_secondary));
+        cancel.setTextColor(getResources().getColor(R.color.amz_text_secondary));
         cancel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         cancel.setGravity(Gravity.CENTER);
         cancel.setPadding(dp(12), dp(12), dp(12), dp(4));
@@ -458,7 +482,7 @@ public class WearNotificationsFragment extends Fragment {
     private View menuButton(Context ctx, String text, View.OnClickListener listener) {
         TextView item = new TextView(ctx);
         item.setText(text);
-        item.setTextColor(ctx.getResources().getColor(R.color.amz_text));
+        item.setTextColor(getResources().getColor(R.color.amz_text));
         item.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         item.setBackgroundResource(R.drawable.bg_reply_pill);
         item.setGravity(Gravity.CENTER);
@@ -472,21 +496,14 @@ public class WearNotificationsFragment extends Fragment {
         return item;
     }
 
-    private void reloadList() {
-        notificationInfoList.clear();
-        if (mAdapter != null)
-            mAdapter.clear();
-        loadNotifications();
-    }
-
     private void clearAll() {
         new AlertDialog.Builder(getActivity())
-                .setTitle(mContext.getResources().getString(R.string.clear_notifications))
-                .setMessage(mContext.getResources().getString(R.string.confirmation))
+                .setTitle(getResources().getString(R.string.clear_notifications))
+                .setMessage(getResources().getString(R.string.confirmation))
                 .setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         NotificationStore.clear();
-                        resetNotificationsCounter();
+                        DeviceUtil.notificationCounterSet(mContext, 0);
                         loadNotifications();
                     }
                 })
@@ -495,20 +512,5 @@ public class WearNotificationsFragment extends Fragment {
 
     private int dp(int value) {
         return (int) (value * mContext.getResources().getDisplayMetrics().density);
-    }
-
-    public static WearNotificationsFragment newInstance(boolean animate) {
-        Logger.info("WearNotificationsFragment newInstance animate: {}", animate);
-
-        WearNotificationsFragment myFragment = new WearNotificationsFragment();
-        Bundle bundle = new Bundle();
-        bundle.putBoolean(ANIMATE, animate);
-        myFragment.setArguments(bundle);
-
-        return myFragment;
-    }
-
-    public static WearNotificationsFragment getInstance() {
-        return instance;
     }
 }
