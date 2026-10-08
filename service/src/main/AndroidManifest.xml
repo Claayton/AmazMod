@@ -154,9 +154,6 @@
             android:name=".support.BatteryJobService"
             android:label="AmazModBatteryJobService"
             android:permission="android.permission.BIND_JOB_SERVICE" />
-        <service
-            android:name=".OverlayLauncher"
-            android:exported="false" />
 
         <receiver
             android:name=".receiver.PackageReceiver"

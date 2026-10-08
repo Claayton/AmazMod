@@ -147,8 +147,6 @@ public class MainService extends Service implements Transporter.DataListener {
     private static long custom_weather_expire = 0L;
     private static WidgetSettings settings;
     private static JobScheduler jobScheduler;
-    private static char overlayLauncherPosition;
-    private static boolean notificationArrived;
 
     private static final long BATTERY_SYNC_INTERVAL = 60*60*1000L; //One hour
     private static final int BATTERY_JOB_ID = 0;
@@ -160,7 +158,6 @@ public class MainService extends Service implements Transporter.DataListener {
     private WatchStatusData watchStatusData;
     private WidgetsData widgetsData;
     private NotificationReplyReceiver notificationReplyReceiver;
-    private BroadcastReceiver screenOnReceiver;
     private SlptClockClient slptClockClient;
     private ContentObserver phoneConnectionObserver;
     private ContentObserver springboardObserver;
@@ -293,9 +290,6 @@ public class MainService extends Service implements Transporter.DataListener {
             }
         }
 
-        // Floating overlay button disabled: notification access is via the widget/logo
-        setOverlayLauncher(false);
-
         // Check if hourly chime is enable
         if (settings.get(Constants.PREF_AMAZMOD_HOURLY_CHIME, false) || (WearMenuFragment.chimeEnabled))
             setHourlyChime(true);
@@ -394,10 +388,6 @@ public class MainService extends Service implements Transporter.DataListener {
             LocalBroadcastManager.getInstance(context).unregisterReceiver(notificationReplyReceiver);
             notificationReplyReceiver = null;
         }
-        if (screenOnReceiver != null) {
-            context.unregisterReceiver(screenOnReceiver);
-            screenOnReceiver = null;
-        }
 
         // Unregister content observers
         registerConnectionMonitor(false);
@@ -480,11 +470,7 @@ public class MainService extends Service implements Transporter.DataListener {
             settings.reload();
             if (settings.get(Constants.PREF_NOTIFICATIONS_SCREEN_ON, 0) == 1)
                 acquireWakelock();
-
-            // Flag used by OverlayLauncher
-            notificationArrived = true;
-        } else if (Transport.INCOMING_NOTIFICATION.equals(action))
-            notificationArrived = true;// Flag used by OverlayLauncher
+        }
 
         // Run a function based on requested action
         Class messageClass = messages.get(action);
@@ -876,12 +862,6 @@ public class MainService extends Service implements Transporter.DataListener {
         if (isWeatherObserverEnabled != iPCA)
             registerWeatherMonitor(iPCA);
          */
-
-        //Toggle OverlayLauncher service
-        iPCA = settingsData.isOverlayLauncher();
-        Logger.debug("MainService SyncSettings isOverlayLauncher: {}", iPCA);
-        if (iPCA != settings.get(Constants.PREF_AMAZMOD_OVERLAY_LAUNCHER, false))
-            setOverlayLauncher(iPCA);
 
         //Toggle Hourly Chime
         iPCA = settingsData.isHourlyChime();
@@ -1795,24 +1775,6 @@ public class MainService extends Service implements Transporter.DataListener {
         isWeatherObserverEnabled = status;
     }
 
-    private void setOverlayLauncher(boolean status){
-        Logger.debug("MainService setOverlayLauncher called with {} (floating button disabled)", status);
-
-        final Intent overlayButton = new Intent(context, OverlayLauncher.class);
-
-        // The floating button was removed to avoid overlapping content; always ensure it is stopped.
-        if (screenOnReceiver != null) {
-            try {
-                context.unregisterReceiver(screenOnReceiver);
-            } catch (Exception e) {
-                Logger.error(e, "setOverlayLauncher unregister: {}", e.getMessage());
-            }
-            screenOnReceiver = null;
-        }
-        context.stopService(overlayButton);
-        settings.set(Constants.PREF_AMAZMOD_OVERLAY_LAUNCHER, false);
-    }
-
     public void setHourlyChime(boolean status){
         Logger.debug("setHourlyChime status: {}", status);
 
@@ -1844,22 +1806,6 @@ public class MainService extends Service implements Transporter.DataListener {
 
     public static void setWasSpringboardSaved(boolean b) {
         wasSpringboardSaved = b;
-    }
-
-    public static char getOverlayLauncherPosition() {
-        return overlayLauncherPosition;
-    }
-
-    public static void setOverlayLauncherPosition(char position) {
-        overlayLauncherPosition = position;
-    }
-
-    public static boolean isNotification() {
-        return notificationArrived;
-    }
-
-    public static void setIsNotification(boolean bol) {
-        notificationArrived = bol;
     }
 
     public static void apkInstallFinish() {
