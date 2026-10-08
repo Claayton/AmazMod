@@ -10,6 +10,8 @@ import com.huami.watch.notification.data.NotificationKeyData;
 import org.greenrobot.eventbus.EventBus;
 import org.tinylog.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import amazmod.com.transport.data.NotificationData;
@@ -18,10 +20,15 @@ public class NotificationStore {
 
     private static ArrayMap<String, NotificationData> customNotifications = new ArrayMap<>();
     public static ArrayMap<String, String> keyMap = new ArrayMap<>();
+    private static ArrayMap<String, Long> timestamps = new ArrayMap<>();
+
+    // Notifications older than this are removed automatically (1 hour)
+    public static final long MAX_AGE = 60L * 60L * 1000L;
 
     public NotificationStore() {
         customNotifications = new ArrayMap<>();
         keyMap = new ArrayMap<>();
+        timestamps = new ArrayMap<>();
     }
 
     public static NotificationData getCustomNotification(String key) {
@@ -35,6 +42,43 @@ public class NotificationStore {
     public static void addCustomNotification(String key, NotificationData notificationData) {
         customNotifications.put(key, notificationData);
         keyMap.put(key, notificationData.getKey());
+        timestamps.put(key, System.currentTimeMillis());
+        purgeExpired();
+    }
+
+    // Removes notifications older than MAX_AGE (1 hour)
+    public static void purgeExpired() {
+        if (timestamps.isEmpty())
+            return;
+        final long now = System.currentTimeMillis();
+        List<String> expired = new ArrayList<>();
+        for (int i = 0; i < timestamps.size(); i++) {
+            Long t = timestamps.valueAt(i);
+            if (t == null || (now - t) > MAX_AGE)
+                expired.add(timestamps.keyAt(i));
+        }
+        for (String key : expired) {
+            customNotifications.remove(key);
+            keyMap.remove(key);
+            timestamps.remove(key);
+            Logger.debug("NotificationStore purgeExpired removed {}", key);
+        }
+    }
+
+    // Removes the stored notification(s) matching an original phone notification key
+    public static void removeByNotificationKey(String originalKey) {
+        if (originalKey == null)
+            return;
+        List<String> toRemove = new ArrayList<>();
+        for (int i = 0; i < keyMap.size(); i++) {
+            if (originalKey.equals(keyMap.valueAt(i)))
+                toRemove.add(keyMap.keyAt(i));
+        }
+        for (String key : toRemove) {
+            customNotifications.remove(key);
+            keyMap.remove(key);
+            timestamps.remove(key);
+        }
     }
 
     public static void removeCustomNotification(String key, Context context) {
@@ -127,6 +171,7 @@ public class NotificationStore {
                 sendRequestDeleteNotification(key);
             customNotifications.clear();
             keyMap.clear();
+            timestamps.clear();
         }
     }
 

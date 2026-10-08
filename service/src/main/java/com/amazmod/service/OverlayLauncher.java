@@ -13,6 +13,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.view.WindowManager;
+import android.widget.ImageView;
 
 import com.amazmod.service.springboard.LauncherWearGridActivity;
 import com.amazmod.service.util.SystemProperties;
@@ -60,26 +61,17 @@ public class OverlayLauncher extends Service implements OnTouchListener {
 
         initParams();
 
-        overlayLauncher = new View(this);
-        if (atWatchface && (!MainService.isNotification())) {
-            overlayLauncher.setBackgroundColor(overlayColor);
-        }else{
-            overlayLauncher.setBackgroundColor(OVERLAY_COLOR_TRANSPARENT);
-            MainService.setIsNotification(false);
-        }
+        overlayLauncher = new ImageView(this);
+        ((ImageView) overlayLauncher).setImageResource(R.drawable.notify_icon_24);
+        ((ImageView) overlayLauncher).setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        overlayLauncher.setBackgroundResource(R.drawable.overlay_button_bg);
+        overlayLauncher.setPadding(16, 16, 16, 16);
+        overlayLauncher.setAlpha(0.9f);
         overlayLauncher.setOnTouchListener(this);
-
 
         wm.addView(overlayLauncher, params);
 
-        if (atWatchface) {
-            new Handler().postDelayed(new Runnable() {
-                public void run() {
-                    if (overlayLauncher != null)
-                        overlayLauncher.setBackgroundColor(OVERLAY_COLOR_TRANSPARENT);
-                }
-            }, OVERLAY_DELAY);
-        }
+        MainService.setIsNotification(false);
     }
 
     @Override
@@ -152,8 +144,9 @@ public class OverlayLauncher extends Service implements OnTouchListener {
         params.x = 0;
         params.y = 0;
         if (SystemProperties.isVerge()) {
-            params.height = 30;
-            params.width = 170;
+            params.height = 72;
+            params.width = 72;
+            params.y = 120;
             vibration = 30;
             overlayColor = OVERLAY_COLOR_AMOLED;
         }
@@ -176,7 +169,7 @@ public class OverlayLauncher extends Service implements OnTouchListener {
 
     private void setParamsRight() {
         if (SystemProperties.isVerge())
-            params.x = 0;
+            params.x = 12;
         else
             params.x = 0;
         position = POSITION_RIGHT;
@@ -184,7 +177,7 @@ public class OverlayLauncher extends Service implements OnTouchListener {
     }
     private void setParamsLeft() {
         if (SystemProperties.isVerge())
-            params.x = 190;
+            params.x = 276;
         else
             params.x = 170;
         position = POSITION_LEFT;

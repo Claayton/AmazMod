@@ -315,7 +315,7 @@ public class AmazModLauncher extends AbstractPlugin {
         imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                intent.putExtra(LauncherWearGridActivity.MODE, LauncherWearGridActivity.INFO);
+                intent.putExtra(LauncherWearGridActivity.MODE, LauncherWearGridActivity.NOTIFICATIONS);
                 mContext.startActivity(intent);
             }
         });

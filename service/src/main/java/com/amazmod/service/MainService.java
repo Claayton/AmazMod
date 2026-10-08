@@ -902,6 +902,8 @@ public class MainService extends Service implements Transporter.DataListener {
         dataBundle.putString("key", event.getKey()); // Notification unique key
         dataBundle.putString("message", event.getMessage()); // Reply message
         send(Transport.REPLY, dataBundle);
+        // Once replied, the notification no longer needs to stay in the list
+        NotificationStore.removeByNotificationKey(event.getKey());
     }
 
     // Silence specific app notifications for X minutes

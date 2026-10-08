@@ -222,6 +222,8 @@ public class WearNotificationsFragment extends Fragment {
             public List<NotificationInfo> call() {
                 Logger.debug("WearNotificationsFragment loadNotifications call");
 
+                NotificationStore.purgeExpired();
+
                 List<NotificationInfo> notificationInfoList = new ArrayList<>();
                 if (NotificationStore.getKeySet() != null) {
                     for (String key : NotificationStore.getKeySet()) {
