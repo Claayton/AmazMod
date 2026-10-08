@@ -233,7 +233,7 @@
                     android:layout_gravity="center"
                     android:layout_marginTop="10dp"
                     android:background="@drawable/bg_accent_button"
-                    android:text="Responder"
+                    android:text="@string/amz_reply"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFFFF"
                     android:textStyle="bold"
@@ -254,7 +254,7 @@
                     android:layout_gravity="center"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_reply_pill"
-                    android:text="Silenciar"
+                    android:text="@string/amz_mute"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFFFF"
                     tools:visibility="visible" />
@@ -275,7 +275,7 @@
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="12dp"
                     android:background="@drawable/bg_reply_pill"
-                    android:text="Excluir"
+                    android:text="@string/amz_delete"
                     android:textAllCaps="false"
                     android:textColor="#FFFF8A80"
                     tools:visibility="visible" />

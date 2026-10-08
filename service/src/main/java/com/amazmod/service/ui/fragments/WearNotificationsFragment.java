@@ -446,14 +446,14 @@ public class WearNotificationsFragment extends Fragment {
         titleParams.bottomMargin = dp(10);
         layout.addView(title, titleParams);
 
-        layout.addView(menuButton(ctx, "Atualizar", new View.OnClickListener() {
+        layout.addView(menuButton(ctx, getString(R.string.amz_refresh), new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
                 loadNotifications();
             }
         }));
 
-        layout.addView(menuButton(ctx, "Limpar tudo", new View.OnClickListener() {
+        layout.addView(menuButton(ctx, getString(R.string.amz_clear_all), new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
                 clearAll();
@@ -461,7 +461,7 @@ public class WearNotificationsFragment extends Fragment {
         }));
 
         TextView cancel = new TextView(ctx);
-        cancel.setText("Cancelar");
+        cancel.setText(getString(R.string.amz_cancel));
         cancel.setTextColor(getResources().getColor(R.color.amz_text_secondary));
         cancel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         cancel.setGravity(Gravity.CENTER);

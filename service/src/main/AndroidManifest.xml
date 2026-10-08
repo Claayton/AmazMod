@@ -72,6 +72,11 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Transparent" />
         <activity
+            android:name=".ui.UIPreviewActivity"
+            android:exported="true"
+            android:label=""
+            android:theme="@style/Theme.Transparent" />
+        <activity
             android:name=".ui.ConfirmationWearActivity"
             android:allowEmbedded="true"
             android:exported="true"

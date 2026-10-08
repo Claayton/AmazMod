@@ -181,4 +181,19 @@
     <string name="alarm_dismiss">Dismiss</string>
     <string name="camera_delay">Delay</string>
     <string name="camera_shutter">Camera Shutter</string>
+
+    <!-- AmazMod notification UI -->
+    <string name="amz_reply">Responder</string>
+    <string name="amz_cancel">Cancelar</string>
+    <string name="amz_refresh">Atualizar</string>
+    <string name="amz_clear_all">Limpar tudo</string>
+    <string name="amz_delete">Excluir</string>
+    <string name="amz_mute">Silenciar</string>
+    <string name="amz_conversation">Conversa</string>
+    <string name="amz_reply_sent">Resposta enviada</string>
+    <string name="amz_no_replies">Sem respostas prontas</string>
+    <plurals name="amz_message_count">
+        <item quantity="one">%d mensagem</item>
+        <item quantity="other">%d mensagens</item>
+    </plurals>
 </resources>

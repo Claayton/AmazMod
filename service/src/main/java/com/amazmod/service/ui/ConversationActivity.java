@@ -91,7 +91,7 @@ public class ConversationActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView header = new TextView(this);
-        header.setText(title != null ? title : "Conversa");
+        header.setText(title != null ? title : getString(R.string.amz_conversation));
         header.setTextColor(getResources().getColor(R.color.amz_text));
         header.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         header.setTypeface(Typeface.DEFAULT_BOLD);
@@ -103,7 +103,7 @@ public class ConversationActivity extends Activity {
         List<String> keys = NotificationStore.getConversationStoreKeys(conversationKey);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText(keys.size() + (keys.size() == 1 ? " mensagem" : " mensagens"));
+        subtitle.setText(getResources().getQuantityString(R.plurals.amz_message_count, keys.size(), keys.size()));
         subtitle.setTextColor(getResources().getColor(R.color.amz_text_secondary));
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         subtitle.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -123,7 +123,7 @@ public class ConversationActivity extends Activity {
         }
 
         TextView replyButton = new TextView(this);
-        replyButton.setText("Responder");
+        replyButton.setText(getString(R.string.amz_reply));
         replyButton.setTextColor(0xFFFFFFFF);
         replyButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         replyButton.setTypeface(Typeface.DEFAULT_BOLD);
@@ -177,7 +177,7 @@ public class ConversationActivity extends Activity {
     private void showReplies() {
         final List<Reply> replies = util.listReplies();
         if (replies == null || replies.isEmpty()) {
-            Toast.makeText(this, "Sem respostas prontas", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.amz_no_replies), Toast.LENGTH_SHORT).show();
             return;
         }
         if (replyOverlay != null && replyOverlay.getParent() != null) {
@@ -198,7 +198,7 @@ public class ConversationActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(this);
-        title.setText("Responder");
+        title.setText(getString(R.string.amz_reply));
         title.setTextColor(getResources().getColor(R.color.amz_text));
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -231,7 +231,7 @@ public class ConversationActivity extends Activity {
         }
 
         TextView cancel = new TextView(this);
-        cancel.setText("Cancelar");
+        cancel.setText(getString(R.string.amz_cancel));
         cancel.setTextColor(getResources().getColor(R.color.amz_text_secondary));
         cancel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         cancel.setGravity(Gravity.CENTER);
@@ -262,7 +262,7 @@ public class ConversationActivity extends Activity {
         EventBus.getDefault().post(new ReplyNotificationEvent(conversationKey, value));
         NotificationStore.removeByNotificationKey(conversationKey);
         Logger.debug("ConversationActivity sendReply: {}", value);
-        Toast.makeText(this, "Resposta enviada", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.amz_reply_sent), Toast.LENGTH_SHORT).show();
         finish();
     }
 
