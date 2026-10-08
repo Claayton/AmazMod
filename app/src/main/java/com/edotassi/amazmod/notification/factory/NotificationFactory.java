@@ -166,7 +166,8 @@ public class NotificationFactory {
     // last-modified time and ship that image to the watch.
     private static final String[] MESSAGING_IMAGE_DIRS = {
             "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images",
-            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Sent"
+            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/Sent",
+            "/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Stickers"
     };
 
     private static void extractMessagingImage(StatusBarNotification statusBarNotification, NotificationData notificationData) {
@@ -185,7 +186,7 @@ public class NotificationFactory {
                     continue;
                 Bundle message = (Bundle) parcelable;
                 String type = message.getString("type");
-                if (type != null && type.startsWith("image/")) {
+                if (type != null && (type.startsWith("image/") || type.contains("sticker") || type.contains("webp"))) {
                     long time = message.getLong("time", 0);
                     if (time > imageTime)
                         imageTime = time;
