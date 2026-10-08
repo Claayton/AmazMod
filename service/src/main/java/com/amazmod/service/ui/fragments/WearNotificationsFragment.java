@@ -7,16 +7,11 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -25,19 +20,16 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.collection.ArrayMap;
-import androidx.core.graphics.drawable.RoundedBitmapDrawable;
-import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory;
 
 import com.amazmod.service.R;
 import com.amazmod.service.support.NotificationInfo;
 import com.amazmod.service.support.NotificationStore;
 import com.amazmod.service.ui.ConversationActivity;
+import com.amazmod.service.ui.view.NotificationCardView;
 import com.amazmod.service.ui.view.ReplyPillView;
 import com.amazmod.service.util.DeviceUtil;
 
 import amazmod.com.transport.data.NotificationData;
-
-import org.tinylog.Logger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,9 +43,6 @@ import java.util.List;
 public class WearNotificationsFragment extends Fragment {
 
     static WearNotificationsFragment instance = null;
-
-    private static final int SWIPE_THRESHOLD = 60;
-    private static final int DELETE_REVEAL = 90;
 
     private Context mContext;
     private ScrollView scroll;
@@ -239,154 +228,25 @@ public class WearNotificationsFragment extends Fragment {
     }
 
     private View buildCard(final NotificationInfo info) {
-        LinearLayout card = new LinearLayout(mContext);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setBackgroundResource(R.drawable.bg_bubble);
-        int pad = dp(10);
-        card.setPadding(pad, pad, pad, pad);
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardParams.topMargin = dp(4);
-        cardParams.bottomMargin = dp(4);
-        card.setLayoutParams(cardParams);
+        return new NotificationCardView(mContext, info, cardListener);
+    }
 
-        ImageView icon = new ImageView(mContext);
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(40), dp(40));
-        icon.setLayoutParams(iconParams);
-        setCardIcon(icon, info);
-        card.addView(icon);
-
-        LinearLayout texts = new LinearLayout(mContext);
-        texts.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams textsParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        textsParams.leftMargin = dp(10);
-        textsParams.rightMargin = dp(8);
-        card.addView(texts, textsParams);
-
-        TextView title = new TextView(mContext);
-        title.setText(info.getNotificationTitle());
-        title.setTextColor(getResources().getColor(R.color.amz_text));
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setSingleLine(true);
-        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        texts.addView(title);
-
-        TextView preview = new TextView(mContext);
-        preview.setText(info.getNotificationText());
-        preview.setTextColor(getResources().getColor(R.color.amz_text_secondary));
-        preview.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        preview.setSingleLine(true);
-        preview.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        previewParams.topMargin = dp(2);
-        texts.addView(preview, previewParams);
-
-        LinearLayout meta = new LinearLayout(mContext);
-        meta.setOrientation(LinearLayout.VERTICAL);
-        meta.setGravity(Gravity.CENTER);
-        card.addView(meta);
-
-        TextView time = new TextView(mContext);
-        time.setText(info.getNotificationTime());
-        time.setTextColor(getResources().getColor(R.color.amz_text_secondary));
-        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-        time.setGravity(Gravity.CENTER);
-        meta.addView(time);
-
-        if (info.getMessageCount() > 1) {
-            TextView badge = new TextView(mContext);
-            badge.setText(String.valueOf(info.getMessageCount()));
-            badge.setTextColor(Color.WHITE);
-            badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-            badge.setTypeface(Typeface.DEFAULT_BOLD);
-            badge.setGravity(Gravity.CENTER);
-            badge.setBackgroundResource(R.drawable.bg_badge);
-            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(22), dp(22));
-            badgeParams.topMargin = dp(4);
-            badgeParams.gravity = Gravity.CENTER;
-            meta.addView(badge, badgeParams);
+    private final NotificationCardView.Listener cardListener = new NotificationCardView.Listener() {
+        @Override
+        public void onCardClick(NotificationInfo info) {
+            openConversation(info);
         }
 
-        attachGestures(card, info);
-        return card;
-    }
-
-    private void setCardIcon(ImageView iconView, final NotificationInfo info) {
-        try {
-            byte[] largeIconData = info.getLargeIconData();
-            if (largeIconData != null && largeIconData.length > 0) {
-                Bitmap bitmap = BitmapFactory.decodeByteArray(largeIconData, 0, largeIconData.length);
-                if (bitmap != null) {
-                    RoundedBitmapDrawable rounded = RoundedBitmapDrawableFactory.create(getResources(), bitmap);
-                    rounded.setCircular(true);
-                    rounded.setAntiAlias(true);
-                    iconView.setImageDrawable(rounded);
-                    return;
-                }
-            }
-            Drawable drawable = info.getIcon();
-            if (drawable != null)
-                iconView.setImageDrawable(drawable);
-            else
-                iconView.setImageResource(R.drawable.amazmod);
-        } catch (Exception e) {
-            Logger.error(e, "setCardIcon: {}", e.getMessage());
+        @Override
+        public void onCardLongClick(NotificationInfo info) {
+            deleteNotification(info, true);
         }
-    }
 
-    private void attachGestures(final LinearLayout card, final NotificationInfo info) {
-        card.setOnTouchListener(new View.OnTouchListener() {
-            private float downX, downY;
-            private boolean swiping;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        downX = event.getX();
-                        downY = event.getY();
-                        swiping = false;
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        float dx = event.getX() - downX;
-                        float dy = event.getY() - downY;
-                        if (!swiping && dx < -20 && Math.abs(dx) > Math.abs(dy))
-                            swiping = true;
-                        if (swiping)
-                            v.setTranslationX(Math.max(dx, -DELETE_REVEAL));
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        v.animate().translationX(0).setDuration(120).start();
-                        if (swiping) {
-                            float total = event.getX() - downX;
-                            if (total < -SWIPE_THRESHOLD)
-                                deleteNotification(info, false);
-                        } else {
-                            float moved = Math.abs(event.getX() - downX) + Math.abs(event.getY() - downY);
-                            if (moved < 20)
-                                openConversation(info);
-                        }
-                        return true;
-                    case MotionEvent.ACTION_CANCEL:
-                        v.animate().translationX(0).setDuration(120).start();
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-        });
-        card.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                deleteNotification(info, true);
-                return true;
-            }
-        });
-    }
+        @Override
+        public void onCardSwiped(NotificationInfo info) {
+            deleteNotification(info, false);
+        }
+    };
 
     private void openConversation(NotificationInfo info) {
         if (info.getConversationKey() == null)
