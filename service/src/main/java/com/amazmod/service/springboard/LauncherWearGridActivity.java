@@ -136,6 +136,9 @@ public class LauncherWearGridActivity extends Activity {
         clearBackStack();
         final ArrayList<Fragment> fragList = new ArrayList<>();
 
+        // On the notifications screen let row views handle horizontal swipes (swipe-to-delete)
+        mGridViewPager.setInterceptHorizontal(!(mode == NOTIFICATIONS || mode == NOTIFICATIONS_FROM_WATCHFACE));
+
         switch (mode) {
 
             case CAMERA:

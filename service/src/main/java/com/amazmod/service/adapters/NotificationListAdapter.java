@@ -55,6 +55,14 @@ public class NotificationListAdapter extends WearableListView.Adapter {
         itemViewHolder.notificationContentPreview.setText(item.getNotificationText());
         itemViewHolder.notificationTime.setText(item.getNotificationTime());
 
+        int count = item.getMessageCount();
+        if (count > 1) {
+            itemViewHolder.notificationCount.setText(String.valueOf(count));
+            itemViewHolder.notificationCount.setVisibility(View.VISIBLE);
+        } else {
+            itemViewHolder.notificationCount.setVisibility(View.GONE);
+        }
+
         // Code changed to identify special languages (eg Hebrew)
         util.setFontLocale(itemViewHolder.notificationTitle, item.getNotificationTitle());
         util.setFontLocale(itemViewHolder.notificationContentPreview, item.getNotificationText());
@@ -71,6 +79,7 @@ public class NotificationListAdapter extends WearableListView.Adapter {
         EmojiTextView notificationTitle;
         EmojiTextView notificationContentPreview;
         TextView notificationTime;
+        TextView notificationCount;
 
         ItemViewHolder(View itemView) {
             super(itemView);
@@ -79,6 +88,7 @@ public class NotificationListAdapter extends WearableListView.Adapter {
             notificationTitle = itemView.findViewById(R.id.row_notification_title);
             notificationContentPreview = itemView.findViewById(R.id.row_notification_contents_preview);
             notificationTime = itemView.findViewById(R.id.row_notification_time);
+            notificationCount = itemView.findViewById(R.id.row_notification_count);
         }
     }
 

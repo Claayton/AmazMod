@@ -16,6 +16,8 @@ public class NotificationInfo {
     private byte[] largeIconData;
     private String key;
     private String id;
+    private String conversationKey;
+    private int messageCount = 1;
 
     public NotificationInfo(){}
 
@@ -49,6 +51,13 @@ public class NotificationInfo {
 
     }
 
+    // Constructor for a grouped conversation row (representative = latest message)
+    public NotificationInfo(NotificationData notificationData, String key, String conversationKey, int messageCount) {
+        this(notificationData, key);
+        this.conversationKey = conversationKey;
+        this.messageCount = messageCount;
+    }
+
     public String getNotificationTitle() {
         return this.notificationTitle;
     }
@@ -73,6 +82,14 @@ public class NotificationInfo {
 
     public String getId() {
         return this.id;
+    }
+
+    public String getConversationKey() {
+        return conversationKey;
+    }
+
+    public int getMessageCount() {
+        return messageCount;
     }
 
 }

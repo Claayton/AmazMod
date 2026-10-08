@@ -11,6 +11,8 @@ import org.greenrobot.eventbus.EventBus;
 import org.tinylog.Logger;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -78,6 +80,32 @@ public class NotificationStore {
             customNotifications.remove(key);
             keyMap.remove(key);
             timestamps.remove(key);
+        }
+    }
+
+    // Returns the store keys of a conversation (same phone key), sorted oldest -> newest
+    public static List<String> getConversationStoreKeys(String originalKey) {
+        List<String> keys = new ArrayList<>();
+        if (originalKey == null)
+            return keys;
+        for (int i = 0; i < keyMap.size(); i++) {
+            if (originalKey.equals(keyMap.valueAt(i)))
+                keys.add(keyMap.keyAt(i));
+        }
+        Collections.sort(keys, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return Long.compare(parseTimestamp(a), parseTimestamp(b));
+            }
+        });
+        return keys;
+    }
+
+    private static long parseTimestamp(String storeKey) {
+        try {
+            return Long.parseLong(storeKey.substring(storeKey.lastIndexOf("|") + 1));
+        } catch (Exception e) {
+            return 0L;
         }
     }
 

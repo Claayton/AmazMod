@@ -293,9 +293,8 @@ public class MainService extends Service implements Transporter.DataListener {
             }
         }
 
-        // Start OverlayLauncher
-        if (settings.get(Constants.PREF_AMAZMOD_OVERLAY_LAUNCHER, false))
-            setOverlayLauncher(true);
+        // Floating overlay button disabled: notification access is via the widget/logo
+        setOverlayLauncher(false);
 
         // Check if hourly chime is enable
         if (settings.get(Constants.PREF_AMAZMOD_HOURLY_CHIME, false) || (WearMenuFragment.chimeEnabled))
@@ -1797,37 +1796,21 @@ public class MainService extends Service implements Transporter.DataListener {
     }
 
     private void setOverlayLauncher(boolean status){
-        Logger.debug("MainService setOverlayLauncher status: {}", status);
+        Logger.debug("MainService setOverlayLauncher called with {} (floating button disabled)", status);
 
         final Intent overlayButton = new Intent(context, OverlayLauncher.class);
 
-        if (status) {
-            // Register
-            startService(overlayButton);
-            final IntentFilter screenOnFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
-            screenOnFilter.addAction(Intent.ACTION_SCREEN_OFF);
-            screenOnFilter.addAction(Intent.ACTION_USER_PRESENT);
-            screenOnReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    String action = intent.getAction();
-                    Logger.debug("MainService setOverlayLauncher receiver action: {}", action);
-                    if (Intent.ACTION_SCREEN_ON.equals(action))
-                        context.startService(overlayButton);
-                    else if (Intent.ACTION_SCREEN_OFF.equals(action))
-                        context.stopService(overlayButton);
-                }};
-            context.registerReceiver(screenOnReceiver, screenOnFilter);
-
-        } else {
-            // Unregister
-            if (screenOnReceiver != null) {
+        // The floating button was removed to avoid overlapping content; always ensure it is stopped.
+        if (screenOnReceiver != null) {
+            try {
                 context.unregisterReceiver(screenOnReceiver);
-                screenOnReceiver = null;
+            } catch (Exception e) {
+                Logger.error(e, "setOverlayLauncher unregister: {}", e.getMessage());
             }
-            context.stopService(overlayButton);
+            screenOnReceiver = null;
         }
-        settings.set(Constants.PREF_AMAZMOD_OVERLAY_LAUNCHER, status);
+        context.stopService(overlayButton);
+        settings.set(Constants.PREF_AMAZMOD_OVERLAY_LAUNCHER, false);
     }
 
     public void setHourlyChime(boolean status){

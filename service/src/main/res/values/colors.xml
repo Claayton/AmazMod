@@ -13,4 +13,13 @@
     <color name="colorGraph">#eeeeee</color>
     <color name="colorCharging">#00E676</color>
     <color name="colorPrediction">#e6000f</color>
+
+    <!-- AmazMod notification UI palette -->
+    <color name="amz_bg">#FF000000</color>
+    <color name="amz_surface">#FF1C1C1E</color>
+    <color name="amz_surface_variant">#FF2A2A2E</color>
+    <color name="amz_text">#FFFFFFFF</color>
+    <color name="amz_text_secondary">#FF9E9E9E</color>
+    <color name="amz_accent">#FFFF6D00</color>
+    <color name="amz_divider">#1FFFFFFF</color>
 </resources>

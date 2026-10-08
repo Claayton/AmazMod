@@ -65,8 +65,8 @@ public class OverlayLauncher extends Service implements OnTouchListener {
         ((ImageView) overlayLauncher).setImageResource(R.drawable.notify_icon_24);
         ((ImageView) overlayLauncher).setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         overlayLauncher.setBackgroundResource(R.drawable.overlay_button_bg);
-        overlayLauncher.setPadding(16, 16, 16, 16);
-        overlayLauncher.setAlpha(0.9f);
+        overlayLauncher.setPadding(10, 10, 10, 10);
+        overlayLauncher.setAlpha(0.72f);
         overlayLauncher.setOnTouchListener(this);
 
         wm.addView(overlayLauncher, params);
@@ -144,9 +144,9 @@ public class OverlayLauncher extends Service implements OnTouchListener {
         params.x = 0;
         params.y = 0;
         if (SystemProperties.isVerge()) {
-            params.height = 72;
-            params.width = 72;
-            params.y = 120;
+            params.height = 60;
+            params.width = 60;
+            params.y = 130;
             vibration = 30;
             overlayColor = OVERLAY_COLOR_AMOLED;
         }

@@ -9,14 +9,23 @@ import android.view.MotionEvent;
 public class HorizontalGridViewPager extends GridViewPager {
 
     private final GestureDetector mGestureDetector;
+    private boolean interceptHorizontal = true;
 
     public HorizontalGridViewPager(Context context, AttributeSet attrs ) {
         super( context, attrs );
         mGestureDetector = new GestureDetector( context, new HScrollDetector() );
     }
 
+    // When disabled the pager will not intercept horizontal scrolls, so row views
+    // (e.g. notification rows with swipe-to-delete) can handle them.
+    public void setInterceptHorizontal(boolean intercept) {
+        this.interceptHorizontal = intercept;
+    }
+
     @Override
     public boolean onInterceptTouchEvent( MotionEvent ev ) {
+        if (!interceptHorizontal)
+            return false;
         // If we have more horizontal than vertical scrolling, intercept the event,
         // otherwise let the child handle it
         return super.onInterceptTouchEvent( ev ) && mGestureDetector.onTouchEvent( ev );

@@ -8,4 +8,24 @@
     <dimen name="padding_round">16dp</dimen>
     <dimen name="padding_round_small">8dp</dimen>
     <dimen name="padding_round_large">24dp</dimen>
+
+    <!-- AmazMod notification UI spacing scale -->
+    <dimen name="amz_space_xs">4dp</dimen>
+    <dimen name="amz_space_s">8dp</dimen>
+    <dimen name="amz_space_m">12dp</dimen>
+    <dimen name="amz_space_l">16dp</dimen>
+    <dimen name="amz_space_xl">24dp</dimen>
+
+    <dimen name="amz_radius_s">12dp</dimen>
+    <dimen name="amz_radius_m">16dp</dimen>
+    <dimen name="amz_radius_l">24dp</dimen>
+
+    <dimen name="amz_font_title">18sp</dimen>
+    <dimen name="amz_font_body">15sp</dimen>
+    <dimen name="amz_font_caption">11sp</dimen>
+    <dimen name="amz_button_height">44dp</dimen>
+
+    <!-- Circular safe-area insets (horizontal margins) -->
+    <dimen name="amz_safe_inset_edge">40dp</dimen>
+    <dimen name="amz_safe_inset_center">12dp</dimen>
 </resources>
