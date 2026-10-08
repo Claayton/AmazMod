@@ -32,6 +32,7 @@ import com.amazmod.service.R;
 import com.amazmod.service.support.NotificationInfo;
 import com.amazmod.service.support.NotificationStore;
 import com.amazmod.service.ui.ConversationActivity;
+import com.amazmod.service.ui.view.ReplyPillView;
 import com.amazmod.service.util.DeviceUtil;
 
 import amazmod.com.transport.data.NotificationData;
@@ -479,14 +480,8 @@ public class WearNotificationsFragment extends Fragment {
     }
 
     private View menuButton(Context ctx, String text, View.OnClickListener listener) {
-        TextView item = new TextView(ctx);
+        ReplyPillView item = new ReplyPillView(ctx);
         item.setText(text);
-        item.setTextColor(getResources().getColor(R.color.amz_text));
-        item.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        item.setBackgroundResource(R.drawable.bg_reply_pill);
-        item.setGravity(Gravity.CENTER);
-        item.setMinHeight(dp(44));
-        item.setPadding(dp(12), dp(10), dp(12), dp(10));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.bottomMargin = dp(8);

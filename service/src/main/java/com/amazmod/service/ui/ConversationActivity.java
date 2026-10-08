@@ -19,6 +19,7 @@ import com.amazmod.service.R;
 import com.amazmod.service.events.ReplyNotificationEvent;
 import com.amazmod.service.support.NotificationStore;
 import com.amazmod.service.ui.view.MessageBubbleView;
+import com.amazmod.service.ui.view.ReplyPillView;
 import com.amazmod.service.util.FragmentUtil;
 import com.amazmod.service.util.SafeArea;
 
@@ -204,15 +205,8 @@ public class ConversationActivity extends Activity {
         panel.addView(title, titleParams);
 
         for (final Reply reply : replies) {
-            TextView item = new TextView(this);
+            ReplyPillView item = new ReplyPillView(this);
             item.setText(reply.getValue());
-            item.setTextColor(getResources().getColor(R.color.amz_text));
-            item.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-            item.setBackgroundResource(R.drawable.bg_reply_pill);
-            item.setGravity(Gravity.CENTER);
-            item.setMinHeight(SafeArea.dp(this, 44));
-            item.setPadding(SafeArea.dp(this, 12), SafeArea.dp(this, 10),
-                    SafeArea.dp(this, 12), SafeArea.dp(this, 10));
             LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             itemParams.bottomMargin = SafeArea.dp(this, 8);
