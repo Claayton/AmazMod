@@ -35,6 +35,7 @@ import com.amazmod.service.R;
 import com.amazmod.service.events.ReplyNotificationEvent;
 import com.amazmod.service.events.SilenceApplicationEvent;
 import com.amazmod.service.support.NotificationStore;
+import com.amazmod.service.ui.ConversationActivity;
 import com.amazmod.service.ui.NotificationWearActivity;
 import com.amazmod.service.util.FragmentUtil;
 import com.amazmod.service.util.SystemProperties;
@@ -205,6 +206,29 @@ public class NotificationFragment extends Fragment implements DelayedConfirmatio
             }
 
             populateNotificationIcon(icon, iconBadge, notificationData);
+
+            // Tapping the notification content opens the whole conversation
+            View.OnClickListener openConversation = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    try {
+                        Intent intent = new Intent(getActivity(), ConversationActivity.class);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                        intent.putExtra(ConversationActivity.KEY, notificationKey);
+                        intent.putExtra(ConversationActivity.TITLE, notificationData.getTitle());
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        Logger.error(e, "NotificationFragment openConversation: {}", e.getMessage());
+                    }
+                }
+            };
+            title.setOnClickListener(openConversation);
+            text.setOnClickListener(openConversation);
+            picture.setOnClickListener(openConversation);
+            image.setOnClickListener(openConversation);
+            icon.setOnClickListener(openConversation);
 
             if (hasPicture(notificationData)) {
                 populateNotificationPicture(picture, notificationData);
