@@ -18,6 +18,7 @@ import android.widget.Toast;
 import com.amazmod.service.R;
 import com.amazmod.service.events.ReplyNotificationEvent;
 import com.amazmod.service.support.NotificationStore;
+import com.amazmod.service.ui.view.MessageBubbleView;
 import com.amazmod.service.util.FragmentUtil;
 import com.amazmod.service.util.SafeArea;
 
@@ -149,14 +150,8 @@ public class ConversationActivity extends Activity {
     }
 
     private void addMessage(LinearLayout container, NotificationData data, boolean isLast) {
-        TextView bubble = new TextView(this);
+        MessageBubbleView bubble = new MessageBubbleView(this);
         bubble.setText(!TextUtils.isEmpty(data.getText()) ? data.getText() : data.getTitle());
-        bubble.setTextColor(getResources().getColor(R.color.amz_text));
-        bubble.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        bubble.setBackgroundResource(R.drawable.bg_bubble);
-        bubble.setPadding(SafeArea.dp(this, 14), SafeArea.dp(this, 10),
-                SafeArea.dp(this, 14), SafeArea.dp(this, 10));
-        bubble.setMaxWidth(SafeArea.dp(this, 205));
 
         LinearLayout.LayoutParams bubbleParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
